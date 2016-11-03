@@ -17,23 +17,28 @@ enum GitHubRequestType {
     case repositories
     case star(repo: Repository)
     case unStar(repo: Repository)
+    case oauth
+    case token(url: URL)
 
     private enum BaseURL {
         
         static let api = "https://api.github.com"
-        
+        static let standard = "https://github.com"
     }
     
     private enum Path {
         
         static let repositories = "/repositories"
         static func starred(repo: Repository) -> String { return "/user/starred/\(repo.fullName)" }
-        
+        static let oauth = "/login/oauth/authorize"
     }
     
     private enum Query {
         
         static let repositories = "?client_id=\(Secrets.clientID)&client_secret=\(Secrets.clientSecret)"
+        static let oauth = "?client_id=\(Secrets.clientID)&scope=repo"
+        static let accessToken = "/login/oauth/access_token"
+        
         static func starred(token: String) -> String {
             return "?client_id=\(Secrets.clientID)&client_secret=\(Secrets.clientSecret)&access_token="
         }
@@ -41,7 +46,8 @@ enum GitHubRequestType {
     
     fileprivate func buildParams(with code: String) -> [String: String]? {
     
-        return nil
+        let parameters = ["client_id" : Secrets.clientID, "client_secret" : Secrets.clientSecret, "code" : code]
+        return parameters
         
     }
     
@@ -54,6 +60,10 @@ enum GitHubRequestType {
             return "PUT"
         case .unStar:
             return "DELETE"
+        case .oauth:
+            return nil
+        case .token:
+            return "POST"
         }
         
     }
@@ -65,6 +75,10 @@ enum GitHubRequestType {
             return URL(string: BaseURL.api + Path.starred(repo: repo) + Query.starred(token: GitHubAPIClient.accessToken))!
         case .repositories:
             return URL(string: BaseURL.api + Path.repositories + Query.repositories)!
+        case .oauth:
+            return URL(string: BaseURL.standard + Path.oauth + Query.oauth)!
+        case .token:
+            return URL(string: BaseURL.standard + Query.accessToken)!
         }
         
     }
@@ -113,9 +127,22 @@ struct GitHubAPIClient {
             var request = URLRequest(url: type.url)
             request.httpMethod = type.method!
             return request
+        case .token(url: let url):
+            let code = url.getQueryItemValue(named: "code")
+            let parameters = type.buildParams(with: code!)
             
-//        default:
-//            return nil
+            var request = URLRequest(url: url)
+            request.httpMethod = type.method
+            request.addValue("application/json", forHTTPHeaderField: "Accept")
+            request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+            
+            let jsonRequest = try! JSONSerialization.data(withJSONObject: parameters, options: [])
+            
+            request.httpBody?.append(jsonRequest)
+            
+            return request
+        default:
+            return nil
         }
         
     }
@@ -141,8 +168,10 @@ struct GitHubAPIClient {
                 (json, starred, error) = processRepositories(response: response)
             case .star, .unStar:
                 (json, starred, error) = processStarred(response: response)
-//            default:
-//                (json, starred, error) = (nil, nil, GitHubError.response)
+            case .token:
+                (json, starred, error) = processToken(response: response)
+            default:
+                (json, starred, error) = (nil, nil, GitHubError.response)
             
             }
             completionHandler(json, starred, error)
@@ -201,7 +230,14 @@ struct GitHubAPIClient {
     }
     
     private static func processToken(response: (Data?, URLResponse?, Error?)) -> Response {
-
+        let (data, _, error) = response
+        if error != nil { return (nil, nil, error) }
+        guard let tokenData = data else { return (nil, nil, GitHubError.data) }
+        
+        let accessToken = try? JSONSerialization.data(withJSONObject: tokenData, options: [])
+        
+        saveAccess(token: String(describing: accessToken))
+        
         return (nil, nil, nil)
         
     }
