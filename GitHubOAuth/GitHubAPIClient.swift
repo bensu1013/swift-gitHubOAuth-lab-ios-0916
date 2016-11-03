@@ -40,7 +40,7 @@ enum GitHubRequestType {
         static let accessToken = "/login/oauth/access_token"
         
         static func starred(token: String) -> String {
-            return "?client_id=\(Secrets.clientID)&client_secret=\(Secrets.clientSecret)&access_token="
+            return "?client_id=\(Secrets.clientID)&client_secret=\(Secrets.clientSecret)&access_token=\(GitHubAPIClient.accessToken)"
         }
     }
     
@@ -127,18 +127,21 @@ struct GitHubAPIClient {
             var request = URLRequest(url: type.url)
             request.httpMethod = type.method!
             return request
+            
         case .token(url: let url):
             let code = url.getQueryItemValue(named: "code")
             let parameters = type.buildParams(with: code!)
             
-            var request = URLRequest(url: url)
-            request.httpMethod = type.method
+            var request = URLRequest(url: type.url)
+            request.httpMethod = type.method!
             request.addValue("application/json", forHTTPHeaderField: "Accept")
             request.addValue("application/json", forHTTPHeaderField: "Content-Type")
             
-            let jsonRequest = try! JSONSerialization.data(withJSONObject: parameters, options: [])
+            let jsonRequest = try! JSONSerialization.data(withJSONObject: parameters!, options: [])
             
-            request.httpBody?.append(jsonRequest)
+            
+            
+            request.httpBody = jsonRequest
             
             return request
         default:
@@ -234,11 +237,15 @@ struct GitHubAPIClient {
         if error != nil { return (nil, nil, error) }
         guard let tokenData = data else { return (nil, nil, GitHubError.data) }
         
-        let accessToken = try? JSONSerialization.data(withJSONObject: tokenData, options: [])
+        // Are we serializing data to send? Or receiving data to serialize?
+        let json = try! JSONSerialization.jsonObject(with: tokenData, options: []) as! [String: String]
+        let token = json["access_token"]
         
-        saveAccess(token: String(describing: accessToken))
+        let saveError = saveAccess(token: token!)
+        print("\n\n\n\n\n**************TOKEN: \(accessToken)")
         
-        return (nil, nil, nil)
+        
+        return (nil, nil, saveError)
         
     }
 
@@ -272,7 +279,13 @@ struct GitHubAPIClient {
     
     static func deleteAccessToken() -> Error?  {
         
-        return nil
+        do {
+            try Locksmith.deleteDataForUserAccount(userAccount: "github")
+            return nil
+        } catch let error {
+            return error
+        }
+        
 
     }
     

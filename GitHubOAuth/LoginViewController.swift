@@ -28,7 +28,6 @@ class LoginViewController: UIViewController {
         setUpImageViewAnimation()
         
         NotificationCenter.default.addObserver(self, selector: #selector(safariLogin), name: .closeSafariVC, object: nil)
-
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -69,20 +68,16 @@ class LoginViewController: UIViewController {
         
     }
     
-    
-    
-    
     func safariLogin(notification: Notification) {
-        
-        guard let url = URL(string: String(describing: notification.object)) else {return}
-        print(url)
+
         dismiss(animated: true) { completion in
             
+        let url = notification.object as! URL
             
             GitHubAPIClient.request(.token(url: url), completionHandler: { (json, starred, error) in
-                print(GitHubRequestType.oauth.url)
-                print("case .token: \(GitHubRequestType.token(url: url))")
-                print("\n\n\n\n\n\n***********ERROR\(error)")
+                print("2. \(GitHubRequestType.oauth)")
+                print("3. case .token: \(GitHubRequestType.token(url: url))")
+                print("\n\n\n\n\n\n4. ***********ERROR \(error)")
                 if error == nil {
                     NotificationCenter.default.post(name: .closeLoginVC, object: nil)
                 }
@@ -98,17 +93,8 @@ class LoginViewController: UIViewController {
         svc = SFSafariViewController(url: GitHubRequestType.oauth.url)
        
         present(svc, animated: true, completion: nil)
-        
-    
     }
     
     
 
 }
-
-
-
-
-
-
-

@@ -20,11 +20,8 @@ class RepositoryTableViewController: UITableViewController {
         self.title = "Repositories"
         
         store.getRepositories { error in
-            
             (error == nil) ? self.tableView.reloadData() : print(error?.localizedDescription)
-            
         }
-
     }
 
     // MARK: Table view data source
@@ -43,8 +40,9 @@ class RepositoryTableViewController: UITableViewController {
     // MARK: Action
     
     @IBAction func logoutButtonTapped(_ sender: AnyObject) {
-        
-
+        if GitHubAPIClient.deleteAccessToken() == nil {
+            NotificationCenter.default.post(name: .closeReposTVC, object: nil)
+        }
     }
 
 }
