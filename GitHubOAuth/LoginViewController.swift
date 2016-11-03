@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import SafariServices
 import Locksmith
 
 class LoginViewController: UIViewController {
@@ -14,6 +15,8 @@ class LoginViewController: UIViewController {
     @IBOutlet weak var loginImageView: UIImageView!
     @IBOutlet weak var loginButton: UIButton!
     @IBOutlet weak var imageBackgroundView: UIView!
+    
+    var safariVC: SFSafariViewController!
     
     let numberOfOctocatImages = 10
     var octocatImages: [UIImage] = []
@@ -24,6 +27,9 @@ class LoginViewController: UIViewController {
         super.viewDidLoad()
         
         setUpImageViewAnimation()
+        
+        NotificationCenter.default.addObserver(self, selector: #selector(safariLogin), name: Notification.Name.closeSafariVC, object: nil)
+        
 
     }
     
@@ -68,10 +74,22 @@ class LoginViewController: UIViewController {
     // MARK: Action
     
     @IBAction func loginButtonTapped(_ sender: UIButton) {
-        
-    
+        safariVC = SFSafariViewController(url: GitHubRequestType.oauth.url)
+        present(safariVC, animated: true) { 
+            
+        }
     }
     
+    func safariLogin(notification: Notification) {
+        let url = notification.object as! URL
+        safariVC.dismiss(animated: true, completion: nil)
+        print(url)
+        GitHubAPIClient.request(GitHubRequestType.token(url: url)) { (data, starred, error) in
+            if error == nil {
+                NotificationCenter.default.post(name: Notification.Name.closeLoginVC, object: nil)
+            }
+        }
+    }
     
 
 }
